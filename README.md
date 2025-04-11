@@ -144,37 +144,76 @@ bigcoin-cli --path keys.txt print
 #!/bin/bash
 
 # 配置参数
-KEYS_PATH="/root/path/to/keys.txt"
-BIGCOIN_CLI="/root/path/to/bigcoin-bot"
-TARGET_ADDRESS="0x您的目标地址"
-MIN_REWARDS="0.1"  # 最小待领取奖励阈值
+KEYS_PATH="/root/bigcoin-bot/keys.txt"
+BIGCOIN_CLI="/root/bigcoin-bot/target/release/bigcoin-cli"
+TARGET_ADDRESS="接收地址"
+MIN_REWARDS="2"  # 最小待领取奖励阈值
 MIN_CLAIM_AMOUNT="0.01"
 MIN_TRANSFER_AMOUNT="0.01"
 LOG_FILE="/root/bigcoin-auto.log"
 
-# 安装必要工具
-apt-get update && apt-get install -y bc
+# 检查bc是否安装，如果没有则安装
+if ! command -v bc &> /dev/null; then
+    echo "正在安装bc工具..." | tee -a $LOG_FILE
+    apt-get update && apt-get install -y bc
+    echo "bc工具安装完成" | tee -a $LOG_FILE
+fi
 
-# 循环检查
+# 创建日志文件
+touch $LOG_FILE
+
+echo "自动化脚本已启动，每60秒检查一次。记录日志到 $LOG_FILE" | tee -a $LOG_FILE
+echo "目标地址: $TARGET_ADDRESS" | tee -a $LOG_FILE
+
 while true; do
+    # 记录当前时间
     current_time=$(date "+%Y-%m-%d %H:%M:%S")
     echo "[$current_time] 开始检查..." | tee -a $LOG_FILE
     
     # 获取奖励信息
     rewards_output=$($BIGCOIN_CLI --path $KEYS_PATH print)
+    echo "[$current_time] 奖励检查输出:" | tee -a $LOG_FILE
+    echo "$rewards_output" | tee -a $LOG_FILE
     
     # 提取总待领取奖励
-    total_rewards=$(echo "$rewards_output" | grep "Total pending rewards:" | awk '{print $4}')
-    
-    # 检查并执行操作
-    if (( $(echo "$total_rewards > $MIN_REWARDS" | bc -l) )); then
-        echo "[$current_time] 待领取奖励($total_rewards)大于阈值，执行claim操作..." | tee -a $LOG_FILE
-        $BIGCOIN_CLI --path $KEYS_PATH claim --min-claim-amount $MIN_CLAIM_AMOUNT
-        sleep 5
-        $BIGCOIN_CLI --path $KEYS_PATH transfer -r $TARGET_ADDRESS -m $MIN_TRANSFER_AMOUNT
+    if echo "$rewards_output" | grep -q "Total pending rewards:"; then
+        total_rewards=$(echo "$rewards_output" | grep "Total pending rewards:" | awk '{print $4}')
+        echo "[$current_time] 提取到总待领取奖励: $total_rewards" | tee -a $LOG_FILE
+        
+        # 检查总奖励是否为数字
+        if [[ $total_rewards =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+            # 使用bc进行浮点数比较
+            if (( $(echo "$total_rewards > $MIN_REWARDS" | bc -l) )); then
+                echo "[$current_time] 待领取奖励($total_rewards)大于阈值($MIN_REWARDS)，执行claim操作..." | tee -a $LOG_FILE
+                
+                # 执行claim操作
+                claim_output=$($BIGCOIN_CLI --path $KEYS_PATH claim --min-claim-amount $MIN_CLAIM_AMOUNT 2>&1)
+                echo "[$current_time] Claim结果:" | tee -a $LOG_FILE
+                echo "$claim_output" | tee -a $LOG_FILE
+                
+                # 延迟几秒等待claim完成
+                sleep 30
+                
+                echo "[$current_time] 执行transfer操作..." | tee -a $LOG_FILE
+                
+                # 执行transfer操作
+                transfer_output=$($BIGCOIN_CLI --path $KEYS_PATH transfer -r $TARGET_ADDRESS -m $MIN_TRANSFER_AMOUNT 2>&1)
+                echo "[$current_time] Transfer结果:" | tee -a $LOG_FILE
+                echo "$transfer_output" | tee -a $LOG_FILE
+                
+                echo "[$current_time] 操作完成" | tee -a $LOG_FILE
+            else
+                echo "[$current_time] 待领取奖励($total_rewards)小于阈值($MIN_REWARDS)，不执行操作" | tee -a $LOG_FILE
+            fi
+        else
+            echo "[$current_time] 错误: 提取的奖励'$total_rewards'不是有效数字" | tee -a $LOG_FILE
+        fi
     else
-        echo "[$current_time] 待领取奖励($total_rewards)小于阈值，不执行操作" | tee -a $LOG_FILE
+        echo "[$current_time] 错误: 无法找到'Total pending rewards:'字段" | tee -a $LOG_FILE
     fi
+    
+    echo "[$current_time] 等待下一次检查..." | tee -a $LOG_FILE
+    echo "-------------------------------------------" | tee -a $LOG_FILE
     
     # 等待60秒
     sleep 60
