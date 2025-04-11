@@ -26,6 +26,8 @@ cd bigcoin-bot
 # 编译项目
 cargo build --release
 
+sudo cp ./target/release/bigcoin-cli /usr/local/bin/
+
 # 可执行文件位于 ./target/release/bigcoin-cli
 ```
 
