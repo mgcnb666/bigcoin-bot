@@ -20,8 +20,8 @@ rustup update
 2. 克隆并编译项目：
 ```bash
 # 克隆仓库
-git clone https://github.com/[仓库地址]/bigcoin-cli.git
-cd bigcoin-cli
+git clone https://github.com/mgcnb666/bigcoin-bot
+cd bigcoin-bot
 
 # 编译项目
 cargo build --release
@@ -143,7 +143,7 @@ bigcoin-cli --path keys.txt print
 
 # 配置参数
 KEYS_PATH="/root/path/to/keys.txt"
-BIGCOIN_CLI="/root/path/to/bigcoin-cli"
+BIGCOIN_CLI="/root/path/to/bigcoin-bot"
 TARGET_ADDRESS="0x您的目标地址"
 MIN_REWARDS="0.1"  # 最小待领取奖励阈值
 MIN_CLAIM_AMOUNT="0.01"
@@ -193,8 +193,8 @@ After=network.target
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/root/bigcoin-cli-main
-ExecStart=/bin/bash /root/bigcoin-cli-main/auto_bigcoin.sh
+WorkingDirectory=/root/bigcoin-bot
+ExecStart=/bin/bash /root/bigcoin-bot/auto_bigcoin.sh
 Restart=always
 RestartSec=10s
 
